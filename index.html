@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake</title>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script>
+      function drawBorder() {
+        ctx.strokeStyle = "gray";
+        ctx.lineWidth = blockSize;
+        ctx.strokeRect(
+          blockSize / 2,
+          blockSize / 2,
+          canvasSize - blockSize,
+          canvasSize - blockSize
+        );
+      }
+
+      function drawScore() {
+        ctx.fillStyle = "black";
+        ctx.textBaseline = "top";
+        ctx.textAlign = "left";
+        ctx.font = "20px Arial";
+        ctx.fillText(`Score: ${score}`, blockSize, blockSize);
+      }
+
+      function gameOver() {
+        isGameOver = true;
+        clearTimeout(timeout);
+        ctx.fillStyle = "black";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.font = "60px Arial";
+        ctx.fillText("Game over", canvasSize / 2, canvasSize / 2);
+
+        ctx.fillStyle = "gray";
+        ctx.font = "20px Arial";
+        ctx.fillText(
+          'Press "Space" to start new game',
+          canvasSize / 2,
+          canvasSize / 2 + 40
+        );
+      }
+
+      function getRandomInteger(min, max) {
+        return Math.floor(min + Math.random() * (max + 1 - min));
+      }
+
+      function Block(col, row) {
+        this.col = col;
+        this.row = row;
+      }
+      Block.prototype.drawSquare = function (color = "black") {
+        ctx.fillStyle = color;
+        ctx.fillRect(
+          this.col * blockSize,
+          this.row * blockSize,
+          blockSize,
+          blockSize
+        );
+      };
+      Block.prototype.drawCircle = function (color = "green") {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(
+          this.col * blockSize + blockSize / 2,
+          this.row * blockSize + blockSize / 2,
+          blockSize / 2,
+          0,
+          Math.PI * 2,
+          false
+        );
+        ctx.fill();
+      };
+      Block.prototype.checkEqual = function (otherBlock) {
+        return otherBlock.col === this.col && otherBlock.row === this.row
+          ? true
+          : false;
+      };
+
+      function Snake() {
+        this.segments = [new Block(7, 5), new Block(6, 5), new Block(5, 5)];
+        this.direction = "right";
+        this.nextDirection = "right";
+      }
+      Snake.prototype.draw = function () {
+        for (const [i, segment] of this.segments.entries()) {
+          segment.drawSquare(
+            i === 0 ? "orange" : i % 2 === 0 ? "brown" : "gray"
+          );
+        }
+      };
+      Snake.prototype.move = function () {
+        const head = this.segments[0];
+        let newHead;
+
+        this.direction = this.nextDirection;
+
+        switch (this.direction) {
+          case "right":
+            newHead = new Block(head.col + 1, head.row);
+            break;
+
+          case "left":
+            newHead = new Block(head.col - 1, head.row);
+            break;
+
+          case "up":
+            newHead = new Block(head.col, head.row - 1);
+            break;
+
+          case "down":
+            newHead = new Block(head.col, head.row + 1);
+            break;
+        }
+
+        if (this.checkCollision(newHead)) {
+          gameOver();
+          return;
+        }
+
+        this.segments.unshift(newHead);
+
+        if (newHead.checkEqual(apple.position)) {
+          score++;
+          timeoutInterval -= 10;
+          while (
+            this.segments.some((segment) => segment.checkEqual(apple.position))
+          ) {
+            apple.move();
+          }
+        } else {
+          this.segments.pop();
+        }
+      };
+      Snake.prototype.checkCollision = function (head) {
+        const wallCollision =
+          head.col === 0 ||
+          head.row === 0 ||
+          head.col === blocksCount - 1 ||
+          head.row === blocksCount - 1;
+
+        const selfCollision = this.segments.some((segment) =>
+          segment.checkEqual(head)
+        );
+
+        return wallCollision || selfCollision;
+      };
+      Snake.prototype.setDirection = function (newDirection) {
+        if (this.direction === "right" && newDirection === "left") {
+          return;
+        }
+        if (this.direction === "left" && newDirection === "right") {
+          return;
+        }
+        if (this.direction === "up" && newDirection === "down") {
+          return;
+        }
+        if (this.direction === "down" && newDirection === "up") {
+          return;
+        }
+
+        this.nextDirection = newDirection;
+      };
+
+      function Apple() {
+        this.position = new Block(10, 10);
+      }
+      Apple.prototype.draw = function () {
+        this.position.drawCircle();
+      };
+      Apple.prototype.move = function () {
+        this.position = new Block(
+          getRandomInteger(1, blocksCount - 2),
+          getRandomInteger(1, blocksCount - 2)
+        );
+      };
+
+      function onKeydown(e) {
+        switch (e.code) {
+          case "ArrowUp":
+            snake.setDirection("up");
+            break;
+
+          case "ArrowLeft":
+            snake.setDirection("left");
+            break;
+
+          case "ArrowDown":
+            snake.setDirection("down");
+            break;
+
+          case "ArrowRight":
+            snake.setDirection("right");
+            break;
+
+          case "Space":
+            isGameOver && startGame();
+            break;
+        }
+      }
+
+      function gameLoop() {
+        ctx.clearRect(
+          blockSize,
+          blockSize,
+          canvasSize - blockSize * 2,
+          canvasSize - blockSize * 2
+        );
+        drawScore();
+        apple.draw();
+        timeout = setTimeout(gameLoop, timeoutInterval);
+        snake.move();
+        !isGameOver && snake.draw();
+      }
+
+      function startGame() {
+        score = 0;
+        timeoutInterval = 200;
+        isGameOver = false;
+
+        snake = new Snake();
+        apple = new Apple();
+
+        gameLoop();
+      }
+
+      const canvas = document.querySelector("#canvas");
+      const ctx = canvas.getContext("2d");
+
+      const canvasSize = 500;
+      const blocksCount = 40;
+      const blockSize = canvasSize / blocksCount;
+      canvas.width = canvasSize;
+      canvas.height = canvasSize;
+
+      drawBorder();
+      let score, timeout, timeoutInterval, isGameOver, snake, apple;
+
+      document.addEventListener("keydown", onKeydown);
+
+      startGame();
+    </script>
+  </body>
+</html>
